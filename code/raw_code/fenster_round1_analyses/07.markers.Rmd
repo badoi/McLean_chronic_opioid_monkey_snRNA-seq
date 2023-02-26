@@ -1,0 +1,96 @@
+---
+title: "Marker identification"
+author: "Sergey Naumenko"
+date: "`r Sys.Date()`"
+output:
+    html_document:
+        code_folding: hide
+        df_print: paged
+        highlight: tango
+        theme: default
+        number_sections: true
+        toc: true
+        toc_float:
+            collapsed: true
+            smooth_scroll: false
+params:
+    variable_features: 3000
+    npcs: 30
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(tidyverse)
+library(readxl)
+library(writexl)
+library(Seurat)
+
+ggplot2::theme_set(theme_light(base_size = 14))
+
+opts_chunk[["set"]](
+    cache = FALSE,
+    dev = c("png", "pdf"),
+    error = TRUE,
+    highlight = TRUE,
+    message = FALSE,
+    prompt = FALSE,
+    tidy = FALSE,
+    warning = FALSE)
+
+```
+
+# Overview
+- Researcher: Robert Fenster 
+- Experiment: fenster2020_morphine_macaques_hbc03961
+- [I used this lesson as a template](https://github.com/hbctraining/scRNA-seq/blob/master/lessons/07_SC_marker_identification.md)
+- markers annotated with [brainrnaseq](https://www.brainrnaseq.org/)
+
+# All markers
+
+Description of the columns:
+
+- cluster: cluster ID
+- gene: ENSEMBL gene id
+- external_gene_name: gene name
+- description: gene_description
+- p_val_adj: Bonferroni-corrected p-value
+- p_val: raw p-value
+- avg_logFC: average log2 fold change. Positive values indicate that the gene is more highly expressed in the cluster.
+- pct.1: The percentage of cells where the gene is detected in the cluster
+- pct.2: The percentage of cells where the gene is detected on average in the other clusters
+
+```{r, rows.print = 25}
+seurat <- readRDS("data/seurat.clusters.RDS")
+markers_file <- "tables/markers.annotated.xlsx"
+if (!file.exists("markers_file")){
+    # long (~1h)
+    markers <- FindAllMarkers(object = seurat,
+                          only.pos = TRUE,
+                          logfc.threshold = 0.25,
+                          min.pct = 0.25
+                          )
+    ensembl_w_description <- read_csv("tables/ensembl_w_description.csv")
+
+    #combine markers with gene descriptions
+    ann_markers <- inner_join(x = markers,
+                          y = ensembl_w_description,
+                          by = c("gene" = "ensembl_gene_id")) %>% unique()
+
+    # Order the rows by p-adjusted values
+    ann_markers <- ann_markers %>%
+            dplyr::arrange(cluster, p_val_adj) %>% 
+        select(cluster, gene, external_gene_name, description, p_val_adj, p_val, avg_logFC, pct.1, pct.2)                      
+
+    write_xlsx(list(ann_markers), "markers_file")
+}else{
+    ann_marders <- read_xlsx("markers_file")
+}
+ann_markers
+
+```
+[Open the annontated markers table in Excel](`r markers_file`)
+
+# R session information
+```{r}
+sessionInfo()
+```
