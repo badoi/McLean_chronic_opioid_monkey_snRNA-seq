@@ -1,13 +1,12 @@
 #!/bin/bash
 #SBATCH -n 1
-#SBATCH --partition=pfen1
-#SBATCH --time 3-00:00:00
-#SBATCH --job-name=grnboost
+#SBATCH --partition=pfen1,pfen_bigmem,pfen3
+#SBATCH --job-name=STARsolo
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=46G
-#SBATCH --error=logs/untar_%A.txt
-#SBATCH --output=logs/untar_%A.txt
+#SBATCH --mem=60G
+#SBATCH --error=logs/align_STARsolo_%A_%a.txt
+#SBATCH --output=logs/align_STARsolo_%A_%a.txt
 #SBATCH --array=1-16
 
 ###################
@@ -22,18 +21,17 @@ BARCODES=/home/bnphan/resources/cell_ranger_barcodes/inDrops_v3_gel_barcode2.16b
 
 mkdir -p $TMPDIR $SOLODIR
 
-cd $TMPDIR
-NAME=$(awk)
-
-SAMPLE_ID=Fenster_2020
+SAMPLE_ID=$(awk -F ',' -v IND=${SLURM_ARRAY_TASK_ID} 'FNR == (IND + 1) {print $1}' \
+${PROJDIR}/data/raw_data/tables/metadata.csv )
 
 if [[ ! -f "$PROJDIR/data/raw_data/STARsolo_out/${SAMPLE_ID}.Log.final.out" ]]; then
 # copy over the fastq files, preserving Run file structure
-rsync $DATADIR/fastq/20200305_RF7824-${NAME}.*.fastq.gz $TMPDIR
+cd $TMPDIR
+rsync -Paq $DATADIR/fastq/20200305_RF7824-${SAMPLE_ID}.*.fastq.gz $TMPDIR
 
-# find all the files
-cDNA_FASTQ=20200305_RF7824-${NAME}.cDNA.fastq.gz
-CB_FASTQ=20200305_RF7824-${NAME}.CBUMI.fastq.gz
+## find all the files
+cDNA_FASTQ=$(ls 20200305_RF7824-${SAMPLE_ID}.cDNA*fastq.gz | tr '[[:space:]]' ',' | sed 's/,$//g')
+CB_FASTQ=$(ls 20200305_RF7824-${SAMPLE_ID}.CBUMI*fastq.gz | tr '[[:space:]]' ',' | sed 's/,$//g')
 
 echo "Aligning samples w/ STARsolo for: ${SAMPLE_ID}."
 ~/src/STAR-2.7.9a/bin/Linux_x86_64/STAR \
