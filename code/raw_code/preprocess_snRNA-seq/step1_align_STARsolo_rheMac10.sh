@@ -14,24 +14,23 @@
 PROJDIR=/projects/pfenninggroup/singleCell/McLean_chronic_opioid_monkey_snRNA-seq
 DATADIR=$PROJDIR/data/raw_data/
 TMPDIR=/scratch/${USER}
-SOLODIR=$DATADIR/STARsolo_out
+SOLODIR=$DATADIR/STARsolo_out2
 
 GENOME_DIR=/home/bnphan/resources/genomes/rheMac10
-BARCODES=/home/bnphan/resources/cell_ranger_barcodes/inDrops_v3_gel_barcode2.16bp.txt
 
 mkdir -p $TMPDIR $SOLODIR
 
 SAMPLE_ID=$(awk -F ',' -v IND=${SLURM_ARRAY_TASK_ID} 'FNR == (IND + 1) {print $1}' \
 ${PROJDIR}/data/raw_data/tables/metadata.csv )
 
-if [[ ! -f "$PROJDIR/data/raw_data/STARsolo_out/${SAMPLE_ID}.Log.final.out" ]]; then
+if [[ ! -f "$SOLODIR/${SAMPLE_ID}.Log.final.out" ]]; then
 # copy over the fastq files, preserving Run file structure
-cd $TMPDIR
+cd $TMPDIR && rm -rf ${SAMPLE_ID}._STARtmp */${SAMPLE_ID}* ${SAMPLE_ID}*
 rsync -Paq $DATADIR/fastq/20200305_RF7824-${SAMPLE_ID}.*.fastq.gz $TMPDIR
 
 ## find all the files
-cDNA_FASTQ=$(ls 20200305_RF7824-${SAMPLE_ID}.cDNA*fastq.gz | tr '[[:space:]]' ',' | sed 's/,$//g')
-CB_FASTQ=$(ls 20200305_RF7824-${SAMPLE_ID}.CBUMI*fastq.gz | tr '[[:space:]]' ',' | sed 's/,$//g')
+cDNA_FASTQ=$(ls 20200305_RF7824-${SAMPLE_ID}.cDNA.fastq.gz | tr '[[:space:]]' ',' | sed 's/,$//g')
+CB_FASTQ=$(ls 20200305_RF7824-${SAMPLE_ID}.CBUMI.fastq.gz | tr '[[:space:]]' ',' | sed 's/,$//g')
 
 echo "Aligning samples w/ STARsolo for: ${SAMPLE_ID}."
 ~/src/STAR-2.7.9a/bin/Linux_x86_64/STAR \
@@ -43,7 +42,7 @@ echo "Aligning samples w/ STARsolo for: ${SAMPLE_ID}."
 --runThreadN 12 \
 --clipAdapterType CellRanger4 \
 --soloType CB_UMI_Simple \
---soloCBwhitelist $BARCODES \
+--soloCBwhitelist None \
 --soloFeatures GeneFull Velocyto \
 --soloStrand Forward \
 --soloBarcodeReadLength 0 \
@@ -55,7 +54,7 @@ echo "Aligning samples w/ STARsolo for: ${SAMPLE_ID}."
 --soloUMIdedup 1MM_CR \
 --outSAMtype None
 
-rsync --remove-source-files -Pauv $TMPDIR/${SAMPLE_ID}* $PROJDIR/data/raw_data/STARsolo_out
+rsync --remove-source-files -Pauv $TMPDIR/${SAMPLE_ID}* $SOLODIR
 rm -rf ${SAMPLE_ID}._STARtmp */${SAMPLE_ID}* ${SAMPLE_ID}*
 else 
 	echo "A completed STARsolo already exists: ${SOLODIR}/${SAMPLE_ID}.Solo.out"
